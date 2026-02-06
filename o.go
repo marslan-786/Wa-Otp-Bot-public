@@ -112,9 +112,9 @@ func processAPI(url string, apiIdx int) {
 									
 									// 2. چینل کا ریفرنس (Promotion)
 									ForwardedNewsletterMessageInfo: &waProto.ForwardedNewsletterMessageInfo{
-										NewsletterJid:   proto.String(PromoChannelID),
+										NewsletterJID:   proto.String(PromoChannelID),
 										NewsletterName:  proto.String(PromoChannelName),
-										ServerMessageId: proto.Int32(100), // ڈمی آئی ڈی
+										ServerMessageID: proto.Int32(100), // ڈمی آئی ڈی
 										ContentType:     waProto.ForwardedNewsletterMessageInfo_UPDATE.Enum(),
 									},
 								},
