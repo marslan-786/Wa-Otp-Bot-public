@@ -111,48 +111,122 @@ func handleHome(w http.ResponseWriter, r *http.Request) {
 
 // --- API Endpoints ---
 
-func handlePairAPI(w http.ResponseWriter, r *http.Request) {
+func handlePairAPILegacy(w http.ResponseWriter, r *http.Request) {
+	// 🔥 CORS Headers (تاکہ براؤزر بلاک نہ کرے)
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// 1. URL سے نمبر نکالنا
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) < 4 {
-		http.Error(w, `{"error":"Invalid URL. Use /link/pair/NUMBER"}`, 400)
+		http.Error(w, `{"error":"Invalid URL format. Use /link/pair/92300xxxx"}`, 400)
 		return
 	}
-	number := parts[3]
+	number := strings.TrimSpace(parts[3])
 
-	fmt.Printf("📱 Pairing Request: %s\n", number)
-
-	device := container.NewDevice()
-	client := whatsmeow.NewClient(device, waLog.Stdout("Pairing", "INFO", true))
+	// 2. نمبر کی صفائی
+	number = strings.ReplaceAll(number, "+", "")
+	number = strings.ReplaceAll(number, " ", "")
+	number = strings.ReplaceAll(number, "-", "")
 	
-	client.AddEventHandler(EventHandler(client))
-
-	if err := client.Connect(); err != nil {
-		http.Error(w, err.Error(), 500)
+	if len(number) < 10 {
+		http.Error(w, `{"error":"Invalid phone number length"}`, 400)
 		return
 	}
 
-	code, err := client.PairPhone(context.Background(), number, true, whatsmeow.PairClientChrome, "Linux")
+	cleanNum := getCleanID(number)
+	fmt.Printf("📱 [PAIRING-GET] Request for: %s\n", cleanNum)
+
+	// 3. پرانے سیشنز کی صفائی (Active Clients + Database)
+	// یہ حصہ بہت اہم ہے تاکہ "Connection Failed" نہ آئے۔
+	
+	// A. میموری سے صاف کریں
+	clientsMutex.Lock()
+	if c, ok := activeClients[cleanNum]; ok {
+		fmt.Printf("🔌 [CLEANUP] Disconnecting active session for %s\n", cleanNum)
+		c.Disconnect()
+		delete(activeClients, cleanNum)
+	}
+	clientsMutex.Unlock()
+
+	// B. ڈیٹا بیس سے صاف کریں
+	devices, _ := container.GetAllDevices(context.Background())
+	for _, dev := range devices {
+		if getCleanID(dev.ID.User) == cleanNum {
+			fmt.Printf("🧹 [DB] Deleting old session from DB for %s\n", cleanNum)
+			dev.Delete(context.Background())
+		}
+	}
+
+	// 4. نیا ڈیوائس اور کلائنٹ بنانا
+	newDevice := container.NewDevice()
+	tempClient := whatsmeow.NewClient(newDevice, waLog.Stdout("Pairing", "INFO", true))
+	
+	// ہینڈلرز شامل کریں
+	tempClient.AddEventHandler(func(evt interface{}) {
+		handler(tempClient, evt)
+	})
+
+	// 5. کنیکٹ کریں
+	if err := tempClient.Connect(); err != nil {
+		fmt.Printf("❌ [CONNECT FAIL] %v\n", err)
+		http.Error(w, fmt.Sprintf(`{"error":"Connection failed: %v"}`, err), 500)
+		return
+	}
+
+	// 6. پیئرنگ کوڈ جنریٹ کریں
+	// تھوڑا سا انتظار تاکہ کنکشن مستحکم ہو جائے
+	time.Sleep(2 * time.Second)
+
+	code, err := tempClient.PairPhone(context.Background(), number, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
 	if err != nil {
-		http.Error(w, err.Error(), 500)
+		fmt.Printf("❌ [PAIR FAIL] %v\n", err)
+		tempClient.Disconnect()
+		http.Error(w, fmt.Sprintf(`{"error":"Pairing Error: %v"}`, err), 500)
 		return
 	}
 
+	fmt.Printf("✅ [CODE GEN] %s -> %s\n", cleanNum, code)
+
+	// 7. بیک گراؤنڈ میں لاگ ان کا انتظار کریں
 	go func() {
+		// 60 سیکنڈ تک چیک کریں کہ لاگ ان ہوا یا نہیں
 		for i := 0; i < 60; i++ {
 			time.Sleep(1 * time.Second)
-			if client.Store.ID != nil {
-				fmt.Printf("✅ Login Successful: %s\n", number)
-				ClientMutex.Lock()
-				ActiveClients[client.Store.ID.ToNonAD().String()] = client
-				ClientMutex.Unlock()
+			if tempClient.Store.ID != nil {
+				fmt.Printf("🎉 [SUCCESS] %s Logged in successfully via GET API!\n", cleanNum)
+				
+				// ایکٹیو لسٹ میں ڈالیں
+				clientsMutex.Lock()
+				activeClients[cleanNum] = tempClient
+				clientsMutex.Unlock()
+				
+				// ڈیٹا بیس میں پریفکس سیٹ کریں (Default)
+				updatePrefixDB(cleanNum, ".")
+				
 				return
 			}
 		}
-		client.Disconnect()
+		// اگر لاگ ان نہیں ہوا تو بند کر دیں
+		fmt.Printf("⌛ [TIMEOUT] Pairing timed out for %s\n", cleanNum)
+		tempClient.Disconnect()
 	}()
 
-	json.NewEncoder(w).Encode(map[string]string{"code": code, "number": number})
+	// 8. HTML کو جواب بھیجیں
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"success": "true",
+		"code":    code,
+		"number":  cleanNum,
+	})
 }
+
 
 func handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 	ClientMutex.Lock()
