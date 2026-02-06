@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"go.mau.fi/whatsmeow"
+//	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
