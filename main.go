@@ -1,7 +1,7 @@
 package main
 
 import (
-	"context"
+	"context" // Context add kia hai
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -33,8 +33,9 @@ func main() {
 	// Initialize Whatsmeow Container with SQLite
 	dbLog := waLog.Stdout("Database", "ERROR", true)
 	var err error
-	// Note: We use the same SQLite DB for sessions but different tables are handled by library
-	container, err = sqlstore.New("sqlite3", "file:./data/kami_bot.db?_foreign_keys=on", dbLog)
+	
+	// FIX: Added context.Background() as the first argument
+	container, err = sqlstore.New(context.Background(), "sqlite3", "file:./data/kami_bot.db?_foreign_keys=on", dbLog)
 	if err != nil {
 		panic(err)
 	}
@@ -50,12 +51,11 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-
-    http.HandleFunc("/", handleHome)
+	
+	http.HandleFunc("/", handleHome)
 	http.HandleFunc("/pic.png", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "pic.png")
 	})
-
 	http.HandleFunc("/link/pair/", handlePairAPI)
 	http.HandleFunc("/link/delete", handleDeleteSession)
 
@@ -79,12 +79,9 @@ func main() {
 	ClientMutex.Unlock()
 }
 
-func handleHome(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "index.html")
-}
-
 func loadSessions() {
-	deviceStore, err := container.GetAllDevices()
+	// FIX: Added context.Background()
+	deviceStore, err := container.GetAllDevices(context.Background())
 	if err != nil {
 		fmt.Println("⚠️ Error getting devices:", err)
 		return
@@ -108,6 +105,10 @@ func loadSessions() {
 	}
 }
 
+func handleHome(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "index.html")
+}
+
 // --- API Endpoints ---
 
 func handlePairAPI(w http.ResponseWriter, r *http.Request) {
@@ -120,11 +121,9 @@ func handlePairAPI(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("📱 Pairing Request: %s\n", number)
 
-	// Create New Device in Container
 	device := container.NewDevice()
 	client := whatsmeow.NewClient(device, waLog.Stdout("Pairing", "INFO", true))
 	
-	// Hook Handler
 	client.AddEventHandler(EventHandler(client))
 
 	if err := client.Connect(); err != nil {
@@ -138,7 +137,6 @@ func handlePairAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Wait for login in background
 	go func() {
 		for i := 0; i < 60; i++ {
 			time.Sleep(1 * time.Second)
@@ -157,14 +155,13 @@ func handlePairAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteSession(w http.ResponseWriter, r *http.Request) {
-    // Note: For a public bot, you'd usually want to delete by Number, not ALL.
-    // This function currently deletes everything (Admin Only).
 	ClientMutex.Lock()
 	defer ClientMutex.Unlock()
 	
 	for id, cli := range ActiveClients {
 		cli.Disconnect()
-		cli.Store.Delete()
+		// FIX: Added context.Background()
+		cli.Store.Delete(context.Background()) 
 		delete(ActiveClients, id)
 	}
 	
