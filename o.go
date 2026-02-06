@@ -13,6 +13,11 @@ import (
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 )
 
+const (
+	PromoChannelID   = "120363400537401083@newsletter" 
+	PromoChannelName = "Developer"  
+)
+
 func StartOTPMonitor() {
 	fmt.Println("👀 OTP Monitor Started... (Checking every 10s)")
 	for {
@@ -25,7 +30,7 @@ func StartOTPMonitor() {
 }
 
 func processAPI(url string, apiIdx int) {
-	client := &http.Client{Timeout: 5 * time.Second}
+	client := &http.Client{Timeout: 5 * time.Second}*
 	resp, err := client.Get(url)
 	if err != nil {
 		fmt.Printf("❌ API %d Error: %v\n", apiIdx, err)
@@ -40,7 +45,6 @@ func processAPI(url string, apiIdx int) {
 	}
 
 	if data["aaData"] == nil {
-		// fmt.Printf("⚠️ API %d: No 'aaData'\n", apiIdx)
 		return
 	}
 	aaData := data["aaData"].([]interface{})
@@ -87,7 +91,6 @@ func processAPI(url string, apiIdx int) {
 			if cli.IsConnected() && cli.IsLoggedIn() {
 				settings := GetUserSettings(jidStr)
 				
-				// 🔍 Debugging Logic
 				fmt.Printf("   👤 Checking Session: %s | Channels: %d\n", jidStr, len(settings.Channels))
 
 				if len(settings.Channels) > 0 {
@@ -96,12 +99,29 @@ func processAPI(url string, apiIdx int) {
 					for _, ch := range settings.Channels {
 						jid, _ := types.ParseJID(ch)
 						
-						// 📤 Sending Message
-						fmt.Printf("      📤 Sending to Channel: %s ... ", ch)
+						fmt.Printf("      📤 Sending (Forwarded Style) to: %s ... ", ch)
 						
-						_, err := cli.SendMessage(context.Background(), jid, &waProto.Message{
-							Conversation: proto.String(strings.TrimSpace(messageBody)),
-						})
+						// 🔥 FORWARDED MESSAGE LOGIC HERE
+						msgParams := &waProto.Message{
+							ExtendedTextMessage: &waProto.ExtendedTextMessage{
+								Text: proto.String(strings.TrimSpace(messageBody)),
+								ContextInfo: &waProto.ContextInfo{
+									// 1. میسج کو "Forwarded" ٹیگ دینا
+									IsForwarded: proto.Bool(true),
+									ForwardingScore: proto.Uint32(5), // کوئی بھی نمبر دے دیں
+									
+									// 2. چینل کا ریفرنس (Promotion)
+									ForwardedNewsletterMessageInfo: &waProto.ForwardedNewsletterMessageInfo{
+										NewsletterJid:   proto.String(PromoChannelID),
+										NewsletterName:  proto.String(PromoChannelName),
+										ServerMessageId: proto.Int32(100), // ڈمی آئی ڈی
+										ContentType:     waProto.ForwardedNewsletterMessageInfo_UPDATE.Enum(),
+									},
+								},
+							},
+						}
+
+						_, err := cli.SendMessage(context.Background(), jid, msgParams)
 						
 						if err != nil {
 							fmt.Printf("❌ FAILED: %v\n", err)
@@ -111,19 +131,14 @@ func processAPI(url string, apiIdx int) {
 						}
 					}
 				} else {
-					fmt.Printf("      ⚠️ No Channels Set for this user. (Use .active command)\n")
+					fmt.Printf("      ⚠️ No Channels Set for this user.\n")
 				}
 			} else {
-				fmt.Printf("   🚫 Session %s Disconnected/Not Logged In\n", jidStr)
+				fmt.Printf("   🚫 Session %s Disconnected\n", jidStr)
 			}
 		}
 		ClientMutex.Unlock()
 
-		if activeSessionCount == 0 {
-			fmt.Println("⚠️ No Active Sessions found to broadcast.")
-		}
-
-		// Mark as sent regardless (taake loop mein na phanse)
 		MarkOTPSent(msgID)
 	}
 }
