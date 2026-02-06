@@ -30,7 +30,7 @@ func StartOTPMonitor() {
 }
 
 func processAPI(url string, apiIdx int) {
-	client := &http.Client{Timeout: 5 * time.Second}*
+	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
 		fmt.Printf("❌ API %d Error: %v\n", apiIdx, err)
