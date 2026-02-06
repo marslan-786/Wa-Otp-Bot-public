@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>𝙎𝙞𝙡𝙚𝙣𝙩 𝙃𝙖𝙘𝙠𝙚𝙧𝙨 Pairing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #050505;
+            background-image: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%);
+            color: white; 
+            font-family: 'Rajdhani', sans-serif;
+            overflow: hidden;
+        }
+        .full-screen { min-height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center; }
+        .glass-card { 
+            background: rgba(20, 20, 20, 0.6); 
+            backdrop-filter: blur(15px); 
+            border: 1px solid rgba(255, 255, 255, 0.08); 
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.05);
+            width: 100%;
+            max-width: 420px;
+            border-radius: 24px; 
+            padding: 40px 30px; 
+            position: relative;
+            overflow: hidden;
+        }
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, cyan, transparent);
+            opacity: 0.5;
+        }
+        .neon-text { text-shadow: 0 0 15px rgba(0, 255, 255, 0.5); }
+        .input-field {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #333;
+            transition: 0.3s;
+        }
+        .input-field:focus {
+            border-color: cyan;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.2);
+        }
+        .action-btn {
+            background: linear-gradient(45deg, #00d2ff, #3a7bd5);
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .action-btn:active { transform: scale(0.98); }
+    </style>
+</head>
+<body class="full-screen">
+
+    <div class="glass-card text-center">
+        <div class="absolute top-4 right-4 flex items-center space-x-2">
+            <span class="text-[10px] text-gray-500 tracking-wider">SYSTEM</span>
+            <div class="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_green]"></div>
+        </div>
+
+        <div class="flex justify-center mb-6">
+            <div class="p-1 rounded-full border border-cyan-500/30">
+                <img src="/pic.png" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/8/89/Portrait_Placeholder.png'" class="w-24 h-24 rounded-full object-cover shadow-2xl">
+            </div>
+        </div>
+
+        <h1 class="text-3xl font-bold tracking-[6px] text-white mb-1 neon-text">𝙎𝙞𝙡𝙚𝙣𝙩 𝙃𝙖𝙘𝙠𝙚𝙧𝙨</h1>
+        <p class="text-cyan-500/70 text-xs tracking-[3px] uppercase mb-8">Multi-Device Pairing</p>
+
+        <div class="space-y-5">
+            <div class="relative group">
+                <input type="text" id="phone-num" placeholder="923001234567" 
+                    class="input-field w-full p-4 rounded-xl text-center text-xl font-mono text-white placeholder-gray-600 outline-none">
+                <p class="text-[10px] text-gray-500 mt-2">ENTER NUMBER WITHOUT +</p>
+            </div>
+
+            <button onclick="pairNow()" id="pair-btn" 
+                class="action-btn w-full py-4 rounded-xl font-bold text-black tracking-widest hover:brightness-110">
+                CONNECT NOW
+            </button>
+        </div>
+
+        <div id="code-section" class="hidden mt-8 pt-6 border-t border-white/5 animate-pulse">
+            <p class="text-[10px] text-cyan-400 font-bold mb-2 uppercase tracking-widest">Pairing Code Generated</p>
+            <div onclick="copyCode()" class="cursor-pointer bg-black/60 border border-cyan-500/30 rounded-xl p-4 relative group">
+                <h2 id="display-code" class="text-3xl font-mono font-black text-white tracking-wider">...</h2>
+                <div class="absolute inset-0 flex items-center justify-center bg-black/80 text-cyan-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
+                    CLICK TO COPY
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-10 text-[9px] text-gray-700 tracking-[4px] uppercase">
+            𝙎𝙞𝙡𝙚𝙣𝙩 𝙃𝙖𝙘𝙠𝙚𝙧𝙨 v1 (OTP Edition)
+        </footer>
+    </div>
+
+    <script>
+        // Modified Logic to work with Go Backend (GET Request)
+        async function pairNow() {
+            const numInput = document.getElementById('phone-num');
+            const btn = document.getElementById('pair-btn');
+            // Clean input: remove non-numeric chars
+            const num = numInput.value.replace(/[^0-9]/g, ''); 
+
+            if(num.length < 10) return alert("Please enter a valid number!");
+            
+            // UI Loading State
+            btn.innerText = "PROCESSING...";
+            btn.classList.add("opacity-50", "cursor-not-allowed");
+            btn.disabled = true;
+
+            try {
+                // Using the specific route from your main.go: /link/pair/NUMBER
+                const response = await fetch(`/link/pair/${num}`);
+                const result = await response.json();
+                
+                if (result.code) {
+                    // Success Formatting
+                    const formattedCode = result.code.match(/.{1,4}/g).join("-");
+                    document.getElementById('display-code').innerText = formattedCode;
+                    
+                    document.getElementById('code-section').classList.remove('hidden');
+                    btn.innerText = "SUCCESS";
+                    btn.classList.replace("action-btn", "bg-green-600");
+                } else {
+                    throw new Error(result.error || "Failed");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Connection failed! Make sure the number is correct (e.g., 92300...)");
+                btn.innerText = "TRY AGAIN";
+                btn.disabled = false;
+                btn.classList.remove("opacity-50", "cursor-not-allowed");
+                btn.classList.remove("bg-green-600");
+                btn.classList.add("action-btn");
+            }
+        }
+
+        function copyCode() {
+            const code = document.getElementById('display-code').innerText.replace(/-/g, ""); // Copy without dashes
+            navigator.clipboard.writeText(code);
+            alert("Code Copied: " + code);
+        }
+    </script>
+</body>
+</html>
