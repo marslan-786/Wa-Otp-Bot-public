@@ -7,10 +7,11 @@ var Config = struct {
 	Interval   int
 }{
 	OTPApiURLs: []string{
-		"https://api-kami-nodejs-production.up.railway.app/api?type=sms",
-		"https://kamina-otp.up.railway.app/d-group/sms",
-		"https://kamina-otp.up.railway.app/npm-neon/sms",
-		"https://kamina-otp.up.railway.app/mait/sms",
+		"https://api-kami-nodejs-production-a53d.up.railway.app/api/sms",
+		"https://kami-api.up.railway.app/d-group/sms",
+		"https://kami-api.up.railway.app/npm-neon/sms",
+		"https://kami-api.up.railway.app/mait/sms",
+		"https://api-node-js-new-production-b09a.up.railway.app/api/sms",
 	},
 	Interval: 5,
 }
