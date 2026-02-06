@@ -40,14 +40,27 @@ func handleCommands(cli *whatsmeow.Client, evt *events.Message) {
 	}
 
 	cmd := strings.ToLower(args[0])
-	userJID := cli.Store.ID.ToNonAD().String() // The bot's own number
-
-	// Check if message is from the owner (Bot itself) or an allowed controller
-	// For this Public Bot model, we assume the user controls their bot by messaging IT or sending messages to "Note to self"
-	// Or messaging in a group.
 	
-	// IMPORTANT: Use the Sender JID to verify permission if needed.
-	// For now, allowing commands if they match syntax.
+	// 🔥 OLD CODE:
+	// fullJID := cli.Store.ID.ToNonAD().String()
+	// userJID := getCleanID(fullJID)
+
+	// ✨ NEW LID FIX:
+	// 1. آنے والے میسج کا Sender چیک کریں
+	senderJID := evt.Info.Sender.ToNonAD().String()
+	
+	// 2. LID System سے پوچھیں کہ اس کا اصلی نمبر کیا ہے؟
+	// اگر یہ بوٹ خود ہے (Note to self) تو `cli.Store.ID` یوز ہوگا، ورنہ Sender
+	targetJID := senderJID
+	if evt.Info.IsFromMe {
+		targetJID = cli.Store.ID.ToNonAD().String()
+	}
+	
+	// 3. Resolve کریں (LID -> Phone)
+	userJID := ResolveJID(targetJID)
+
+	// ڈیبگ لاگ (تاکہ پتہ چلے کنورژن ہو رہی ہے)
+	// fmt.Printf("🤖 Command from: %s (Resolved to: %s)\n", targetJID, userJID)
 
 	switch cmd {
 	case ".id":

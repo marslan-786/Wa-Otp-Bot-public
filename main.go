@@ -46,6 +46,7 @@ func main() {
 
 	// 3. Load Existing Sessions
 	StartAllBots()
+	InitLIDSystem()
 
 	// 4. Start OTP Monitor (Make sure otp.go is present)
 	go StartOTPMonitor()
@@ -128,10 +129,13 @@ func ConnectNewSession(device *store.Device) {
 		return
 	}
 
+    
+
 	ClientMutex.Lock()
 	ActiveClients[cleanID] = newBot
 	ClientMutex.Unlock()
 	fmt.Printf("✅ [LOADED] Session: %s\n", cleanID)
+	RefreshLIDCache()
 }
 
 // ---------------------------------------------------------
