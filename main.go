@@ -28,15 +28,18 @@ var (
 func main() {
 	fmt.Println("🚀 Starting Kami OTP Bot (Multi-Session)...")
 
-	// 1. Initialize Database Tables (From database.go)
+	// 1. Initialize Database Tables (Make sure database.go is present)
 	InitDB()
 
 	// 2. Initialize Whatsmeow Container (SQLite for Volume)
 	dbLog := waLog.Stdout("Database", "ERROR", true)
 	var err error
+	
 	// Railway Volume Path: ./data/
 	os.MkdirAll("./data", 0755) 
-	container, err = sqlstore.New("sqlite3", "file:./data/kami_sessions.db?_foreign_keys=on", dbLog)
+	
+	// 🔥 FIX: Added context.Background() here
+	container, err = sqlstore.New(context.Background(), "sqlite3", "file:./data/kami_sessions.db?_foreign_keys=on", dbLog)
 	if err != nil {
 		panic("❌ Failed to initialize SQLite: " + err.Error())
 	}
@@ -44,7 +47,7 @@ func main() {
 	// 3. Load Existing Sessions
 	StartAllBots()
 
-	// 4. Start OTP Monitor (From otp.go)
+	// 4. Start OTP Monitor (Make sure otp.go is present)
 	go StartOTPMonitor()
 
 	// 5. Setup HTTP Server
@@ -88,6 +91,7 @@ func main() {
 // ---------------------------------------------------------
 
 func StartAllBots() {
+	// 🔥 FIX: Added context.Background()
 	devices, err := container.GetAllDevices(context.Background())
 	if err != nil {
 		fmt.Printf("❌ Could not load sessions: %v\n", err)
@@ -183,9 +187,11 @@ func performPairing(w http.ResponseWriter, rawNumber string) {
 	ClientMutex.Unlock()
 
 	// 2. Cleanup Old Session (Database)
+	// 🔥 FIX: Added context.Background()
 	devices, _ := container.GetAllDevices(context.Background())
 	for _, dev := range devices {
 		if getCleanID(dev.ID.User) == cleanNum {
+			// 🔥 FIX: Added context.Background()
 			dev.Delete(context.Background())
 		}
 	}
@@ -194,7 +200,7 @@ func performPairing(w http.ResponseWriter, rawNumber string) {
 	device := container.NewDevice()
 	client := whatsmeow.NewClient(device, waLog.Stdout("Pairing", "INFO", true))
 	
-	// Handler Add karein (taake login ke foran baad active ho)
+	// Handler Add karein
 	client.AddEventHandler(EventHandler(client))
 
 	if err := client.Connect(); err != nil {
@@ -249,6 +255,7 @@ func handleDeleteSession(w http.ResponseWriter, r *http.Request) {
 	ActiveClients = make(map[string]*whatsmeow.Client)
 
 	// Delete DB
+	// 🔥 FIX: Added context.Background()
 	devs, _ := container.GetAllDevices(context.Background())
 	for _, d := range devs {
 		d.Delete(context.Background())
